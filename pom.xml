@@ -7,6 +7,34 @@
     <groupId>com.mei.pcd.concurrency</groupId>
     <artifactId>concurrency</artifactId>
     <version>1.0-SNAPSHOT</version>
+    <properties>
+        <maven.compiler.source>1.9</maven.compiler.source>
+        <maven.compiler.target>1.9</maven.compiler.target>
+    </properties>
 
-    
+
+<dependencies>
+
+    <dependency>
+        <groupId>com.github.dpaukov</groupId>
+        <artifactId>combinatoricslib3</artifactId>
+        <version>3.3.0</version>
+    </dependency>
+    <dependency>
+        <groupId>org.apache.commons</groupId>
+        <artifactId>commons-lang3</artifactId>
+        <version>3.5</version>
+    </dependency>
+    <!-- https://mvnrepository.com/artifact/commons-codec/commons-codec -->
+    <dependency>
+        <groupId>commons-codec</groupId>
+        <artifactId>commons-codec</artifactId>
+        <version>1.4</version>
+    </dependency>
+    <dependency>
+        <groupId>com.google.guava</groupId>
+        <artifactId>guava</artifactId>
+        <version>25.0-jre</version>
+    </dependency>
+</dependencies>
 </project>
