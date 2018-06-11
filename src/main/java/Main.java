@@ -1,60 +1,85 @@
 import com.google.common.primitives.Bytes;
 import org.apache.commons.codec.digest.DigestUtils;
-import org.apache.commons.lang3.ArrayUtils;
 import org.paukov.combinatorics3.Generator;
 
-import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.PrintWriter;
+import javax.swing.*;
+import java.io.*;
+import java.math.BigDecimal;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.nio.file.StandardOpenOption;
 import java.util.*;
 import java.util.stream.Collectors;
 
 public class Main {
 
     private static StringBuilder ap = new StringBuilder();
-    private static int numberOfCPU;
-    private static final long MAXCOMBOSPERITERATION = 10000;
-    private static final boolean WANNACOUNT = true;
+    private static Integer numberOfCPUs;
+    private static long MAXCOMBOSPERITERATION = 0;
+    private static boolean WANNACOUNT = false;
+    private static String filename = "data.csv";
 
 //TODO especificar o numero de threads
 
 
-    public static void main(String args[]) throws FileNotFoundException {
+    public static void main(String args[]) throws IOException {
 
-        //System.setProperty("propname", "hello world");
         int maxLetras;
-        String palavra;
+        String palavra,aux;
         Long start;
         Long difference;
         Map<String,Object> outValues = new HashMap<>();
+        String threads = "0";
+        numberOfCPUs = Runtime.getRuntime().availableProcessors();
+        Double speedUp;
 
-        maxLetras = "aaaaa".length();
-        palavra = "aaaaa";
+        maxLetras = "zigzag".length(); // 27 min para 7 caracteres,« estimativa de 36 horas para 8 caracteres com 8 cores
+        palavra = "zigzag";
 
-        //questaoUm():
+        if(WANNACOUNT)
+            MAXCOMBOSPERITERATION = 10000;
+        else
+            MAXCOMBOSPERITERATION = 0;
 
-        /*
+
+        questaoUm();
+
+
         BufferedReader br = new BufferedReader(new InputStreamReader(System.in));
-        System.out.print("Maximo de letras : ");
+        System.out.println("Maximo de letras : ");
         maxLetras=Integer.parseInt(br.readLine());
         System.out.println();
-        System.out.print("Palavra chave : ");
+        System.out.println("Hash : ");
         palavra = br.readLine();
-        */
+        System.out.println();
+        System.out.println("Quantas threads : ");
+        threads = br.readLine();
+        if(Integer.parseInt(threads)>1)
+        {   numberOfCPUs = Integer.parseInt(threads);
+                System.setProperty("java.util.concurrent.ForkJoinPool.common.parallelism", String.valueOf(numberOfCPUs));
 
-        numberOfCPU = Runtime.getRuntime().availableProcessors();
+        }
+
+        System.out.println();
+        System.out.println("Quer combinacoes : ");   //0 || 1
+        aux = br.readLine();
+        WANNACOUNT = aux.equalsIgnoreCase("1") ? true : false;
+
+
 
         start = System.nanoTime();
 
         questaoDois(palavra,maxLetras,outValues);
 
         difference = System.nanoTime() - start;
+        speedUp = difference.doubleValue();
+        writeInFile((String)outValues.get("result"),difference,1,0D);
         System.out.println("Combinacoes realizados : "+ (outValues.get("combos")));
-        System.out.println(Double.valueOf(difference/10e9) + " Segundos");
+        System.out.println(BigDecimal.valueOf(difference / 1E9) + " Segundos");
         if (outValues.get("result") == null)
             System.out.println("Não encontrada");
         else {
-            System.out.println("A palavra chave e : " + bytesToString(((List<Byte>)outValues.get("result"))));
+            System.out.println("A palavra chave e : " + outValues.get("result"));
         }
 
         start = System.nanoTime();
@@ -62,19 +87,19 @@ public class Main {
         questaoTres(palavra,maxLetras,outValues);
 
         difference = System.nanoTime() - start;
+        speedUp /= difference.doubleValue();
+        speedUp = (((numberOfCPUs /speedUp)-1) / (numberOfCPUs-1))*100;
+        System.out.println("Frequencia de codigo sequencial : "+ speedUp);
+        writeInFile((String)outValues.get("result"),difference,Integer.parseInt(threads)>0 ? Integer.parseInt(System.getProperty("java.util.concurrent.ForkJoinPool.common.parallelism")) : numberOfCPUs ,speedUp);
         System.out.println("Combinacoes realizados : "+ (outValues.get("combos")));
-        System.out.println(Double.valueOf(difference/10e9) + " Segundos");
+        System.out.println(BigDecimal.valueOf(difference /1E9) + " Segundos");
         if (outValues.get("result") == null)
             System.out.println("Não encontrada");
         else {
-            System.out.println("A palavra chave e : " + bytesToString(((List<Byte>)outValues.get("result"))));
+            System.out.println("A palavra chave e : " + outValues.get("result"));
         }
 
-
-        questaoQuatro();
-
-
-        writeInFile();
+        questaoQuatro((String)outValues.get("result"));
     }
 
     private static void questaoUm()
@@ -86,7 +111,7 @@ public class Main {
 
     private static void questaoDois(String palavra,int maxLetras, Map<String,Object> outValues)
     {
-        byte[] palavraEncriptada = DigestUtils.sha512(palavra);
+        byte[] palavraEncriptada = hexStringToByteArray(palavra);
         List<Byte> result = null;
         int i;
         long combos=0;
@@ -103,7 +128,7 @@ public class Main {
                                 .withRepetitions(i)
                                 .stream()
                                 .sequential()
-                                .filter(item -> Arrays.compare(DigestUtils.sha512(Bytes.toArray(item)), palavraEncriptada) == 0)
+                                .filter(item -> Arrays.equals(DigestUtils.sha512(Bytes.toArray(item)), palavraEncriptada))
                                 .findAny()
                                 .orElse(null);
                 if (WANNACOUNT) {
@@ -112,13 +137,11 @@ public class Main {
                     else {
                         long iteration = 0;
                         double max = Math.pow(26, i);
-                        int index =0;
-
-
+                        boolean find = false;
+                        int index;
 
                         while (max > iteration) {
-
-
+                            index =0;
                             Iterator<List<Byte>> itr = Generator.permutation(
                                     (byte) 'a', (byte) 'b', (byte) 'c', (byte) 'd', (byte) 'e', (byte) 'f',
                                     (byte) 'g', (byte) 'h', (byte) 'i', (byte) 'j', (byte) 'k', (byte) 'l',
@@ -134,19 +157,18 @@ public class Main {
 
                             while(itr.hasNext()) {
                                 List<Byte> element = itr.next();
-                                if (Arrays.compare(Bytes.toArray(element),Bytes.toArray(result)) == 0)
+                                index++;
+                                if (Arrays.equals(Bytes.toArray(element),Bytes.toArray(result)))
                                 {
-                                    index++;
+                                    find = true;
                                     break;
                                 }
                             }
 
                             combos += index;
-                            if (index == -1) {
-                                iteration += MAXCOMBOSPERITERATION;
-                            } else {
+                            if (find)
                                 break;
-                            }
+                            iteration += MAXCOMBOSPERITERATION;
                         }
                     }
                 }
@@ -154,12 +176,16 @@ public class Main {
             }
 
         outValues.put("combos",combos);
-        outValues.put("result",result);
+            if (result != null)
+                outValues.put("result",new String( Bytes.toArray(result)));
+
     }
 
     private static void questaoTres(String palavra, int maxLetras, Map<String,Object> outValues)
     {
-        byte[] palavraEncriptada = DigestUtils.sha512(palavra);
+        byte[] palavraEncriptada = hexStringToByteArray(palavra);
+
+        //ForkJoinPool pool = new ForkJoinPool();
         List<Byte> result = null;
         int i = 1;
         long combos=0;
@@ -173,8 +199,7 @@ public class Main {
                             .withRepetitions(i)
                             .stream()
                             .parallel()
-                            //.forEach(x->{x.forEach(y->{System.out.print((char)y.byteValue());});System.out.println();});
-                            .filter(item -> Arrays.compare(DigestUtils.sha512(Bytes.toArray(item)), palavraEncriptada) == 0)
+                            .filter(item -> Arrays.equals(DigestUtils.sha512(Bytes.toArray(item)), palavraEncriptada))
                             .findAny()
                             .orElse(null);
 
@@ -182,12 +207,13 @@ public class Main {
                 if (result == null)
                     combos += Math.pow(26, i);
                 else {
-                    long iteration = 0;
+                    long iteration = 0; // Para 4 caracteres max : 475254
                     double max = Math.pow(26, i);
-                    int index =0;
+                    int index;
+                    boolean find = false;
 
                     while (max > iteration) {
-
+                        index =0;
                         Iterator<List<Byte>> itr = Generator.permutation(
                                 (byte) 'a', (byte) 'b', (byte) 'c', (byte) 'd', (byte) 'e', (byte) 'f',
                                 (byte) 'g', (byte) 'h', (byte) 'i', (byte) 'j', (byte) 'k', (byte) 'l',
@@ -203,33 +229,36 @@ public class Main {
 
                         while(itr.hasNext()) {
                             List<Byte> element = itr.next();
-                            if (Arrays.compare(Bytes.toArray(element),Bytes.toArray(result)) == 0)
+                            index++;
+                            if (Arrays.equals(Bytes.toArray(element),Bytes.toArray(result)))
                             {
-                                index++;
+                                find = true;
                                 break;
                             }
                         }
 
                         combos += index;
-                        if (index == -1) {
-                            iteration += MAXCOMBOSPERITERATION;
-                        } else {
+                        if (find)
                             break;
-                        }
+                        iteration += MAXCOMBOSPERITERATION;
                     }
                 }
             }
             i++;
         }
         outValues.put("combos",combos);
-        outValues.put("result",result);
-
+        if (result != null)
+            outValues.put("result",new String( Bytes.toArray(result)));
     }
 
-    private static void questaoQuatro()
+    private static void questaoQuatro(String palavra)
     {
-        AmdahlUI aux = new AmdahlUI(numberOfCPU,20);
-        GraphPanel graph = new GraphPanel(40,10);
+        SwingUtilities.invokeLater(() -> {
+            BarChart ex = new BarChart(palavra,filename,false);
+            ex.setVisible(true);
+            BarChart e = new BarChart(palavra,filename,true);
+            e.setVisible(true);
+        });
     }
 
     private static final String stringAsHex(byte[] hash) {
@@ -241,6 +270,16 @@ public class Main {
         }
 
         return ap.toString();
+    }
+
+    public static byte[] hexStringToByteArray(String s) {
+        int len = s.length();
+        byte[] data = new byte[len / 2];
+        for (int i = 0; i < len; i += 2) {
+            data[i / 2] = (byte) ((Character.digit(s.charAt(i), 16) << 4)
+                    + Character.digit(s.charAt(i+1), 16));
+        }
+        return data;
     }
 
     private static byte[] getBytesFast(String str) {
@@ -260,15 +299,13 @@ public class Main {
         return ap.toString();
     }
 
+    private static final void writeInFile(String palavra,Long nanoTime, Integer numProcessors,Double speedUp) throws IOException {
 
-    private static final void writeInFile() throws FileNotFoundException {
-        PrintWriter pw = new PrintWriter(new File("data.csv"));
         StringBuilder sb = new StringBuilder();
-        sb.append("WORD").append(",").append("TIME").append(",").append("PROCESSORS").append("\n");
+        //sb.append("WORD").append(",").append("TIME").append(",").append("PROCESSORS").append(",").append("ALPHA").append("\n");
+        sb.append(palavra).append(",").append(nanoTime).append(",").append(numProcessors).append(",").append(speedUp).append("\n");
 
-
-
-        pw.write(sb.toString());
-        pw.close();
+        Files.write(Paths.get(filename), sb.toString().getBytes(), StandardOpenOption.APPEND);
     }
+
 }
